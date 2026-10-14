@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q3 Project Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 13px;
+            color: #333333;
+            background-color: #ffffff;
+            margin: 20px;
+            line-height: 1.5;
+        }
+        h1 { font-size: 18px; font-weight: bold; margin-bottom: 5px; color: #000; }
+        h2 { font-size: 14px; font-weight: bold; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 3px; color: #000; }
+        h3 { font-size: 13px; font-weight: bold; margin: 0; }
+        
+        .meta { font-size: 11px; color: #666; margin-bottom: 15px; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+        th {
+            text-align: left;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 5px 8px;
+            font-weight: bold;
+        }
+        td {
+            border: 1px solid #eee;
+            padding: 5px 8px;
+        }
+        tr:hover { background-color: #fafafa; }
+        
+        button {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            padding: 3px 10px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            color: #333;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        button:hover:not(:disabled) { background-color: #e5e5e5; border-color: #999; }
+        button:disabled { color: #999; cursor: default; background-color: #f9f9f9; }
+        button.primary { background-color: #eef; border-color: #cce; color: #0066cc; }
+        button.primary:hover:not(:disabled) { background-color: #ddf; }
+
+        .status-note {
+            font-style: italic;
+            color: #cc0000;
+            font-size: 12px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .metrics p { margin: 3px 0; }
+        .metrics strong { color: #000; }
+        
+        .actions { margin: 15px 0; }
+        
+        .footer { margin-top: 30px; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>Q3 Project Dashboard</h1>
+    <div class="meta">Last synced: <span id="sync-time">Just now</span> | Department: Operations</div>
+
+    <div class="grid">
+        <!-- Left Column: Metrics & Actions -->
+        <div>
+            <h2>Current Metrics</h2>
+            <div class="metrics">
+                <p>Processed Tickets: <strong id="tickets-display">0</strong></p>
+                <p>Automation Rate: <span id="rate-display">0.00</span> tickets/sec</p>
+                <p>Overhead Burn: <span id="overhead-display">0.00</span> tickets/sec</p>
+                <p>Net Velocity: <strong id="net-display">0.00</strong> tickets/sec</p>
+                <p>Performance Points: <span id="pp-display">0</span> (+<span id="pp-bonus">0</span>% efficiency)</p>
+            </div>
+
+            <div id="status-note" class="status-note">
+                * Note: Urgent client request active. Productivity doubled for <span id="event-timer">30</span>s.
+            </div>
+
+            <div class="actions">
+                <button id="click-btn" class="primary">[ Process Next Task ]</button>
+            </div>
+
+            <h2>System Controls</h2>
+            <div class="actions">
+                <button id="prestige-btn" onclick="triggerReview()" disabled>[ Initiate Quarterly Review ]</button>
+                <button onclick="saveGame()">Save Progress</button>
+                <button onclick="resetGame()">Reset Dashboard</button>
+            </div>
+        </div>
+
+        <!-- Right Column: Allocation & Improvements -->
+        <div>
+            <h2>Resource Allocation</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Resource</th>
+                        <th>Allocated</th>
+                        <th>Cost to Allocate</th>
+                    </tr>
+                </thead>
+                <tbody id="resources-table">
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+
+            <h2>Process Improvements</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Initiative</th>
+                        <th>Status</th>
+                        <th>Cost</th>
+                    </tr>
+                </thead>
+                <tbody id="improvements-table">
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="footer">
+        Internal Tool v2.4.1 | For internal use only. Do not distribute.
+    </div>
+
+    <script>
+        // --- 1. Game State (Disguised) ---
+        const defaultState = {
+            tickets: 0,
+            totalTickets: 0,
+            clickPower: 1,
+            performancePoints: 0,
+            eventActive: false,
+            eventTimeLeft: 0,
+            timeSinceLastEvent: 0,
+            resources: [
+                { id: 'intern', name: 'Intern', baseCost: 15, count: 0, rate: 0.1, mult: 1, overhead: 0.005 },
+                { id: 'analyst', name: 'Junior Analyst', baseCost: 100, count: 0, rate: 1, mult: 1, overhead: 0.02 },
+                { id: 'manager', name: 'Project Manager', baseCost: 1100, count: 0, rate: 8, mult: 1, overhead: 0.15 },
+                { id: 'director', name: 'Department Director', baseCost: 12000, count: 0, rate: 47, mult: 1, overhead: 1.5 },
+                { id: 'vp', name: 'VP of Operations', baseCost: 130000, count: 0, rate: 260, mult: 1, overhead: 15 }
+            ],
+            improvements: [
+                { id: 'click1', name: 'Ergonomic Keyboard', desc: 'Manual processing 2x faster', cost: 500, purchased: false },
+                { id: 'intern1', name: 'Intern Training', desc: 'Interns 2x as efficient', cost: 1000, purchased: false, target: 'intern', mult: 2 },
+                { id: 'analyst1', name: 'Better Spreadsheets', desc: 'Analysts 2x as efficient', cost: 5000, purchased: false, target: 'analyst', mult: 2 },
+                { id: 'manager1', name: 'Agile Methodology', desc: 'Managers 2x as efficient', cost: 50000, purchased: false, target: 'manager', mult: 2 },
+                { id: 'click2', name: 'AI Copilot License', desc: 'Manual processing 5x faster', cost: 100000, purchased: false },
+                { id: 'director1', name: 'Cross-Dept Synergy', desc: 'Directors 2x as efficient', cost: 250000, purchased: false, target: 'director', mult: 2 },
+                { id: 'remote', name: 'Remote Work Policy', desc: 'Reduces ALL overhead by 50%', cost: 500000, purchased: false }
+            ]
+        };
+
+        let game = JSON.parse(JSON.stringify(defaultState));
+
+        // --- 2. Core Mechanics ---
+        function getCost(res) { return Math.floor(res.baseCost * Math.pow(1.15, res.count)); }
+        function getGrossRate() { return game.resources.reduce((t, r) => t + (r.count * r.rate * r.mult), 0); }
+        
+        function getOverhead() {
+            const remoteDiscount = game.improvements.find(i => i.id === 'remote')?.purchased ? 0.5 : 1;
+            return game.resources.reduce((t, r) => t + (r.count * r.overhead * remoteDiscount), 0);
+        }
+
+        function getGlobalMult() { return 1 + (game.performancePoints * 0.10); }
+        function getEventMult() { return game.eventActive ? 2 : 1; }
+        function getNetRate() { return (getGrossRate() * getGlobalMult() * getEventMult()) - getOverhead(); }
+
+        function addTickets(amount) {
+            game.tickets += amount;
+            if (amount > 0) game.totalTickets += amount;
+            updateUI();
+        }
+
+        // --- 3. User Actions ---
+        document.getElementById('click-btn').addEventListener('click', () => {
+            const amount = game.clickPower * getGlobalMult() * getEventMult();
+            addTickets(amount);
+        });
+
+        function buyResource(index) {
+            const res = game.resources[index];
+            const cost = getCost(res);
+            if (game.tickets >= cost) {
+                game.tickets -= cost;
+                res.count++;
+                updateUI();
+                renderTables();
+            }
+        }
+
+        function buyImprovement(index) {
+            const imp = game.improvements[index];
+            if (imp.purchased || game.tickets < imp.cost) return;
+
+            game.tickets -= imp.cost;
+            imp.purchased = true;
+
+            if (imp.target) {
+                const res = game.resources.find(r => r.id === imp.target);
+                if (res) res.mult *= imp.mult;
+            } else if (imp.id === 'click1') {
+                game.clickPower *= 2;
+            } else if (imp.id === 'click2') {
+                game.clickPower *= 5;
+            }
+            updateUI();
+            renderTables();
+        }
+
+        function triggerReview() {
+            if (game.tickets >= 100) {
+                const pts = Math.max(1, Math.floor(game.tickets / 100));
+                if (confirm(`Initiate Quarterly Review?\n\nThis will reset your resources, improvements, and tickets.\nYou will gain ${pts} Performance Point(s) for a permanent +${pts * 10}% efficiency boost.`)) {
+                    game.performancePoints += pts;
+                    game.tickets = 0;
+                    game.totalTickets = 0;
+                    game.clickPower = 1;
+                    game.resources = JSON.parse(JSON.stringify(defaultState.resources));
+                    game.improvements = JSON.parse(JSON.stringify(defaultState.improvements));
+                    game.eventActive = false;
+                    game.eventTimeLeft = 0;
+                    game.timeSinceLastEvent = 0;
+                    
+                    saveGame(true);
+                    renderTables();
+                    updateUI();
+                }
+            }
+        }
+
+        // --- 4. UI Rendering ---
+        function updateUI() {
+            const net = getNetRate();
+            const gross = getGrossRate();
+            const overhead = getOverhead();
+            const bonus = ((getGlobalMult() * getEventMult() - 1) * 100).toFixed(0);
+
+            document.getElementById('tickets-display').textContent = Math.floor(game.tickets).toLocaleString();
+            document.getElementById('rate-display').textContent = gross.toFixed(2);
+            document.getElementById('overhead-display').textContent = overhead.toFixed(2);
+            document.getElementById('net-display').textContent = net.toFixed(2);
+            document.getElementById('pp-display').textContent = game.performancePoints;
+            document.getElementById('pp-bonus').textContent = game.performancePoints * 10;
+            
+            document.getElementById('sync-time').textContent = new Date().toLocaleTimeString();
+            document.title = `Q3 Dashboard - ${Math.floor(game.tickets)} Tickets`;
+
+            // Event handling (stealth mode)
+            const note = document.getElementById('status-note');
+            if (game.eventActive) {
+                note.style.display = 'block';
+                document.getElementById('event-timer').textContent = Math.ceil(game.eventTimeLeft);
+            } else {
+                note.style.display = 'none';
+            }
+
+            // Prestige button
+            const pBtn = document.getElementById('prestige-btn');
+            pBtn.disabled = game.tickets < 100;
+            if (game.tickets >= 100) {
+                const pts = Math.max(1, Math.floor(game.tickets / 100));
+                pBtn.textContent = `[ Initiate Review (+${pts} PP) ]`;
+            } else {
+                pBtn.textContent = `[ Initiate Quarterly Review ]`;
+            }
+
+            // Update table row states
+            document.querySelectorAll('.res-row').forEach((row, i) => {
+                row.style.opacity = game.tickets >= getCost(game.resources[i]) ? '1' : '0.5';
+            });
+            document.querySelectorAll('.imp-row').forEach((row, i) => {
+                const imp = game.improvements[i];
+                if (imp.purchased) {
+                    row.style.opacity = '0.6';
+                    row.style.textDecoration = 'line-through';
+                } else {
+                    row.style.opacity = game.tickets >= imp.cost ? '1' : '0.5';
+                    row.style.textDecoration = 'none';
+                }
+            });
+        }
+
+        function renderTables() {
+            const resTable = document.getElementById('resources-table');
+            resTable.innerHTML = '';
+            game.resources.forEach((r, i) => {
+                const tr = document.createElement('tr');
+                tr.className = 'res-row';
+                tr.style.cursor = 'pointer';
+                tr.onclick = () => buyResource(i);
+                tr.innerHTML = `
+                    <td>${r.name}</td>
+                    <td>${r.count}</td>
+                    <td>${getCost(r).toLocaleString()} tickets</td>
+                `;
+                resTable.appendChild(tr);
+            });
+
+            const impTable = document.getElementById('improvements-table');
+            impTable.innerHTML = '';
+            game.improvements.forEach((imp, i) => {
+                const tr = document.createElement('tr');
+                tr.className = 'imp-row';
+                tr.style.cursor = imp.purchased ? 'default' : 'pointer';
+                if (!imp.purchased) tr.onclick = () => buyImprovement(i);
+                tr.innerHTML = `
+                    <td title="${imp.desc}">${imp.name}</td>
+                    <td>${imp.purchased ? 'Implemented' : 'Pending'}</td>
+                    <td>${imp.purchased ? '-' : imp.cost.toLocaleString() + ' tickets'}</td>
+                `;
+                impTable.appendChild(tr);
+            });
+        }
+
+        // --- 5. Game Loop & Save System ---
+        setInterval(() => {
+            const net = getNetRate();
+            let change = net / 10;
+            if (game.tickets + change < 0) change = -game.tickets;
+            addTickets(change);
+
+            if (game.eventActive) {
+                game.eventTimeLeft -= 0.1;
+                if (game.eventTimeLeft <= 0) game.eventActive = false;
+            } else {
+                game.timeSinceLastEvent += 0.1;
+                if (game.timeSinceLastEvent > 60 && Math.random() < 0.005) {
+                    game.eventActive = true;
+                    game.eventTimeLeft = 30;
+                    game.timeSinceLastEvent = 0;
+                }
+            }
+        }, 100);
+
+        function saveGame(silent = false) {
+            localStorage.setItem('stealthTrackerSave', JSON.stringify(game));
+            if (!silent) alert('Progress saved successfully.');
+        }
+
+        function loadGame() {
+            const saved = localStorage.getItem('stealthTrackerSave');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                game = { 
+                    ...defaultState, 
+                    ...parsed,
+                    resources: defaultState.resources.map((r, i) => ({ ...r, ...(parsed.resources?.[i] || {}) })),
+                    improvements: defaultState.improvements.map((imp, i) => {
+                        const savedImp = parsed.improvements?.[i];
+                        return savedImp ? { ...imp, purchased: savedImp.purchased } : imp;
+                    })
+                };
+            }
+            renderTables();
+            updateUI();
+        }
+
+        function resetGame() {
+            if (confirm('Clear all local dashboard data? This cannot be undone.')) {
+                localStorage.removeItem('stealthTrackerSave');
+                game = JSON.parse(JSON.stringify(defaultState));
+                renderTables();
+                updateUI();
+            }
+        }
+
+        setInterval(() => saveGame(true), 30000);
+        loadGame();
+    </script>
+</body>
+</html>
